@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Основной сайт ремонта квартир
 
-## Getting Started
+Многостраничный MVP по `../results/PRD.md`: Next.js App Router, Tailwind CSS 4 и PostgreSQL. Сайт показывает услуги, цены и реальный проект, принимает заявки на расчёт, замер и встречу. Авторизации, CRM, онлайн-оплаты и автоматической сметы нет.
 
-First, run the development server:
+## Локальный запуск
+
+Требуется Node.js 24 LTS (служебные команды и тесты используют встроенную поддержку TypeScript).
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Адрес: http://localhost:3000. Главная, услуги, цены, проекты, подробная страница проекта 52 м², подход и контакты работают без базы. Служебные страницы — `/privacy` и `/consent`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`npm test` выполняет тесты проверки полей и доставки. Интеграционные тесты PostgreSQL запускаются только с отдельным `TEST_DATABASE_URL` и используют изолированный тестовый набор. Тесты подменяют Telegram и не отправляют сообщения.
 
-## Learn More
+## Подключение данных
 
-To learn more about Next.js, take a look at the following resources:
+В `.env.example` перечислены настройки. Созданный локальный `.env` содержит пустые подключения и отдельный случайный `LEAD_HASH_SECRET`. Старые настройки другого продукта сохранены в `.env.content-factory-backup`; Next.js их не загружает. Все файлы `.env`, кроме пустого шаблона, исключены из git.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `DATABASE_URL` — новая база PostgreSQL. На VPS база доступна только приложению на том же сервере: `postgresql://пользователь:пароль@localhost:5432/база`.
+- `TELEGRAM_BOT_TOKEN` и `TELEGRAM_CHAT_ID` — серверные параметры бота и чата получения заявок.
+- `LEAD_HASH_SECRET` — случайная строка длиной не менее 32 символов. Сохраняйте постоянной: она используется для защиты от спама.
+- `SITE_URL` — фактический адрес сайта, включая протокол. Используется для проверки источника запросов и sitemap. На локальной проверке можно оставить пустым.
+- `NEXT_PUBLIC_TELEGRAM_URL` — публичная ссылка `https://t.me/username`, отдельная от служебного чата. Пока ссылка не задана, кнопка связи открывает форму.
+- `NEXT_PUBLIC_CONTACT_EMAIL` — рабочая почта. По согласованному макету пока используется `hello@example.com`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+После создания базы на VPS:
 
-## Deploy on Vercel
+```bash
+npm run db:init
+npm run db:seed
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Схема `renovation` добавляется обычным SQL, без удаления прежних таблиц. Seed создаёт одну явно обозначенную тестовую запись для проверки CRUD; Telegram не вызывается. Повторный запуск seed не создаёт дубли. Реальные фотографии и информация о проекте берутся из `src/lib/site.ts` и `public/photos`, тестовые заявки не публикуются на сайте.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Для подключения VPS нужны его IP, SSH-логин и путь к ключу. Приватный ключ не передаётся в репозиторий. Деплой выполняется после предоставления доступа и запроса на размещение; инструкция курса предусматривает учебный адрес `http://IP:3000`.
+
+## Работа с заявками
+
+Публично доступна только отправка `POST /api/leads`. Чтение, изменение и удаление доступны служебной командой с доступом к `.env`:
+
+```bash
+npm run leads -- list
+npm run leads -- show UUID
+npm run leads -- create /путь/к/заявке.json
+npm run leads -- update UUID "Встретились на объекте, согласуем смету"
+npm run leads -- delete UUID --confirm
+```
+
+`create` сохраняет проверенную заявку в состоянии `pending`, не отправляя сообщение. JSON содержит `requestId` (UUID), `phone`, `name`, `area` (число или null), `comment`, `consent: true`, `intent` (`estimate`, `measure`, `meeting`), `source` (путь страницы) и `utm` (объект). `update` изменяет служебную заметку, сохраняя оригинальные поля и номер заявки.
+
+Форма показывает успех только после подтверждённого ответа Telegram. Повтор запроса с тем же UUID и содержимым не отправляет подтверждённую заявку снова. Защита использует ограничения по телефону и общему числу новых обращений, honeypot и проверку Origin. Ошибка не очищает поля.
+
+Состояния доставки: `pending`, `sending`, `delivered`, `failed`, `uncertain`. Если Telegram однозначно отклонил запрос, разрешён повтор с тем же UUID. Если соединение оборвалось и результат неизвестен, автоматический повтор заблокирован, чтобы избежать второго сообщения. Сотрудник проверяет чат:
+
+```bash
+npm run leads -- retry UUID
+npm run leads -- confirm-delivery UUID TELEGRAM_MESSAGE_ID
+```
+
+`confirm-delivery` предназначена только для фактически найденного сообщения. Запись со статусом `sending` может остаться после остановки процесса: её также нужно сверить с чатом. Идентификаторы и секреты бота не выводятся в клиентский код или журналы ошибок.
+
+## Содержание и оформление
+
+Единый источник цен, контактов и сроков — `src/lib/site.ts`. Базовые работы от 10 000 ₽/м², работы по дизайн-проекту от 30 000 ₽/м², разработка проекта отдельно от 1 500 ₽/м². Минимум 21 м², материалы отдельно. Общий срок двухкомнатной квартиры — три месяца; два месяца и 800 000 ₽ с мебелью и техникой относятся только к опубликованному объекту 52 м².
+
+Оптимизированные WebP подготовлены из фотографий заказчика; оригиналы не изменены. Manrope и Golos Text размещены локально с лицензиями OFL. Формы, меню и галерея поддерживают клавиатуру; движения отключаются при `prefers-reduced-motion`.
+
+Название «РЕМОНТ.» — описательное оформление макета. Перед публичным запуском нужно указать название и реквизиты реальной компании в служебных текстах, рабочую почту и Telegram-ссылку. Политика и согласие сейчас являются редактируемыми проектами текста. Подключение настоящего Telegram проверяется отдельной согласованной тестовой заявкой.
+
+## Сохранённый предыдущий проект
+
+Исходники прежнего дашборда, включая незакоммиченные файлы, сохранены в `../backups/content-factory-20261012-214338.tar.gz`. Архив не содержит секретов, `node_modules`, `.next` и git-истории. База старого продукта не сбрасывалась.
