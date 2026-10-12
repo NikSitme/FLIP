@@ -550,17 +550,16 @@ p {
   overflow: hidden;
   min-height: 480px;
 }
-.project-photo img {
-  width: 100%;
-  height: 100%;
+.project-photo .before-after {
   position: absolute;
   inset: 0;
-  object-fit: cover;
-  object-position: center 57%;
-  transition: transform 0.6s;
 }
-.project-preview:hover .project-photo img {
-  transform: scale(1.025);
+.project-photo .comparison-frame {
+  height: 100%;
+  aspect-ratio: auto;
+}
+.project-photo .comparison-frame:has(input:focus-visible) {
+  outline-offset: -3px;
 }
 .photo-tag {
   position: absolute;
@@ -1211,6 +1210,8 @@ p {
 }
 .comparison-frame > img,
 .comparison-before img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -1221,6 +1222,7 @@ p {
   inset: 0;
 }
 .comparison-label {
+  pointer-events: none;
   position: absolute;
   top: 22px;
   background: var(--paper);
@@ -1267,6 +1269,20 @@ p {
   height: 100%;
   opacity: 0;
   cursor: ew-resize;
+  touch-action: pan-y;
+}
+.comparison-hint {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 8px 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 11px;
+  pointer-events: none;
 }
 .comparison-frame:has(input:focus-visible) {
   outline: 3px solid var(--accent);

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LeadButton, LeadForm } from "@/components/LeadForm";
 import { money, questions, services, site, steps } from "@/lib/site";
-import Image from "next/image";
+import { BeforeAfter } from "@/components/BeforeAfter";
 export function PriceOptions() {
   return (
     <div className="price-options">
@@ -187,19 +187,9 @@ export function ProjectPreview() {
           Наши проекты <span aria-hidden="true">↗</span>
         </Link>
       </div>
-      <Link className="project-preview" href="/projects/kvartira-52-m2">
+      <div className="project-preview">
         <div className="project-photo">
-          <Image
-            src="/photos/after.webp"
-            alt={`Обновлённая кухня в квартире ${site.project.area} м²`}
-            width={900}
-            height={1200}
-            sizes="(max-width: 767px) 100vw, 65vw"
-          />
-          <span className="photo-tag">Реальный проект</span>
-          <span className="project-arrow" aria-hidden="true">
-            ↗
-          </span>
+          <BeforeAfter compact />
         </div>
         <div className="project-summary">
           <span className="eyebrow">Санкт-Петербург / Двухкомнатная</span>
@@ -222,9 +212,11 @@ export function ProjectPreview() {
               <dd>{site.project.durationMonths} месяца</dd>
             </div>
           </dl>
-          <span className="text-link">Посмотреть проект ↗</span>
+          <Link className="text-link" href="/projects/kvartira-52-m2">
+            Посмотреть проект ↗
+          </Link>
         </div>
-      </Link>
+      </div>
       <p className="small-note project-note">
         Стоимость и срок этого объекта — пример конкретного ремонта. Общее
         предложение для двухкомнатной квартиры — {site.durationMonths} месяца.
